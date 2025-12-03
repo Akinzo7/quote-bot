@@ -10,76 +10,168 @@ TOKEN = os.getenv("BOT_TOKEN", "")
 GROUP_ID = int(os.getenv("GROUP_ID", "-1003235575515"))
 YOUR_USER_ID = int(os.getenv("USER_ID", "7109052051"))
 TIMEZONE = 'Africa/Lagos'
+
+# Files for persistent storage
 SENT_FILE = "sent_messages.json"
+QUOTES_DB = "quotes_database.json"
 
 bot = Bot(token=TOKEN)
 
-# Fetch all messages from the group (requires bot to be admin)
-def fetch_group_messages():
+# ===== PERSISTENT STORAGE FUNCTIONS =====
+
+def load_quotes_db():
+    """Load all quotes from database"""
+    try:
+        with open(QUOTES_DB, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def save_quotes_db(quotes):
+    """Save all quotes to database"""
+    with open(QUOTES_DB, "w") as f:
+        json.dump(quotes, f, indent=2)
+
+def load_sent():
+    """Load sent message IDs"""
+    try:
+        with open(SENT_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+
+def save_sent(sent):
+    """Save sent message IDs"""
+    with open(SENT_FILE, "w") as f:
+        json.dump(sent, f)
+
+# ===== QUOTE MANAGEMENT =====
+
+def update_quotes_from_group():
+    """Check for new messages in group and add to database"""
+    print("🔍 Checking for new messages in group...")
+    
+    # Load existing quotes
+    all_quotes = load_quotes_db()
+    existing_texts = {q['text'] for q in all_quotes}
+    
+    # Get updates from Telegram
     updates = bot.get_updates(timeout=10)
-    messages = []
+    new_count = 0
+    
     for u in updates:
         msg = u.message
         if msg and msg.chat.id == GROUP_ID:
             text = msg.text
-            if text:
-                messages.append(text)
-    return messages
+            if text and text.strip() and text not in existing_texts:
+                # Add new quote
+                quote = {
+                    'id': msg.message_id,
+                    'text': text,
+                    'date': str(msg.date),
+                    'added_from': 'group'
+                }
+                all_quotes.append(quote)
+                existing_texts.add(text)
+                new_count += 1
+                print(f"  📥 New quote: {text[:50]}...")
+    
+    # Save updated database
+    if new_count > 0:
+        save_quotes_db(all_quotes)
+        print(f"✅ Added {new_count} new quotes to database")
+    
+    return all_quotes
 
-# Load sent messages
-def load_sent():
-    if os.path.exists(SENT_FILE):
-        with open(SENT_FILE, "r") as f:
-            return json.load(f)
-    return []
-
-# Save sent messages
-def save_sent(sent):
-    with open(SENT_FILE, "w") as f:
-        json.dump(sent, f)
-
-# Pick random unsent message
 def pick_message():
-    all_messages = fetch_group_messages()
-    sent = load_sent()
-    unsent = [m for m in all_messages if m not in sent]
-
+    """Pick a random unsent message"""
+    # First update quotes from any new group messages
+    all_quotes = update_quotes_from_group()
+    
+    if not all_quotes:
+        return "📭 No quotes in database! Add some quotes to your group."
+    
+    # Get sent IDs
+    sent_ids = load_sent()
+    
+    # Filter unsent quotes
+    unsent = [q for q in all_quotes if q['id'] not in sent_ids]
+    
     if not unsent:
-        sent = []
-        unsent = all_messages.copy()
+        print("🔄 All quotes sent once. Resetting...")
+        # Reset sent list
+        sent_ids = []
+        unsent = all_quotes.copy()
+    
+    # Pick random quote
+    selected = random.choice(unsent)
+    
+    # Mark as sent
+    sent_ids.append(selected['id'])
+    save_sent(sent_ids)
+    
+    return selected['text']
 
-    message = random.choice(unsent)
-    sent.append(message)
-    save_sent(sent)
-    return message
+# ===== MAIN FUNCTIONS =====
 
-# Send message to yourself
 def send_daily_message():
-    msg = pick_message()
-    bot.send_message(chat_id=YOUR_USER_ID, text=msg)
-    print(f"Sent message: {msg}")
+    """Send one quote"""
+    try:
+        msg = pick_message()
+        bot.send_message(chat_id=YOUR_USER_ID, text=msg)
+        print(f"✅ Sent: {msg[:60]}...")
+    except Exception as e:
+        error_msg = f"❌ Error: {str(e)[:100]}"
+        print(error_msg)
+        try:
+            bot.send_message(chat_id=YOUR_USER_ID, text=error_msg)
+        except:
+            pass
 
-# Test the function immediately
-print("🤖 Bot starting... Testing send function now...")
-try:
+def show_stats():
+    """Show database statistics"""
+    quotes = load_quotes_db()
+    sent = load_sent()
+    print(f"📊 DATABASE STATS:")
+    print(f"Total quotes: {len(quotes)}")
+    print(f"Already sent: {len(sent)}")
+    print(f"Available: {len(quotes) - len(sent)}")
+    
+    if quotes:
+        print(f"\n📝 Recent quotes:")
+        for q in quotes[-3:]:  # Last 3 quotes
+            print(f"  - {q['text'][:50]}...")
+
+# ===== SCHEDULER =====
+
+def start_scheduler():
+    """Start daily scheduler"""
+    print(f"⏰ Starting daily scheduler at 7 AM ({TIMEZONE})...")
+    print("The bot will:")
+    print("1. Check for new messages in your group")
+    print("2. Add them to the database")
+    print("3. Send you one random unsent quote")
+    print("\nPress Ctrl+C to stop")
+    
+    scheduler = BlockingScheduler(timezone=timezone(TIMEZONE))
+    scheduler.add_job(send_daily_message, 'cron', hour=7, minute=0)
+    
+    # Show initial stats
+    show_stats()
+    
+    try:
+        scheduler.start()
+    except KeyboardInterrupt:
+        print("\n👋 Scheduler stopped")
+    except Exception as e:
+        print(f"❌ Scheduler error: {e}")
+
+# ===== TEST =====
+if __name__ == "__main__":
+    # Update quotes and send test message
+    print("🤖 Quote Bot Starting...")
     send_daily_message()
-    print("✅ Test message sent successfully!")
-except Exception as e:
-    print(f"❌ Error in test send: {e}")
-
-# Start scheduler for 7 AM
-print("\n⏰ Starting scheduler for daily 07:00 (Africa/Lagos)...")
-scheduler = BlockingScheduler(timezone=timezone(TIMEZONE))
-scheduler.add_job(send_daily_message, 'cron', hour=7, minute=0)
-
-print("✅ Scheduler started!")
-print("The bot will now send you a message every day at 7 AM.")
-print("Keep this script running...")
-print("Press Ctrl+C to stop\n")
-
-try:
-    scheduler.start()
-except KeyboardInterrupt:
-    print("\n👋 Scheduler stopped by user")
-except Exception as e:
-    print(f"❌ Scheduler error: {e}")
+    show_stats()
+    
+    # Start scheduler
+    start_scheduler()
