@@ -16,7 +16,7 @@ bot = Bot(token=TOKEN)
 
 # Fetch all messages from the group (requires bot to be admin)
 def fetch_group_messages():
-    updates = bot.get_updates()
+    updates = bot.get_updates(timeout=10)
     messages = []
     for u in updates:
         msg = u.message
