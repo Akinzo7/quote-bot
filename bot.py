@@ -5,10 +5,10 @@ import random
 import json
 import os
 
-# CONFIG
-TOKEN = "8361685305:AAEhR-du2ajddrxPtZu1PyJdAShSWfGBSjg"
-GROUP_ID = -1003235575515  # your private group
-YOUR_USER_ID = 7109052051
+# CONFIG - Load from environment
+TOKEN = os.getenv("BOT_TOKEN", "")
+GROUP_ID = int(os.getenv("GROUP_ID", "-1003235575515"))
+YOUR_USER_ID = int(os.getenv("USER_ID", "7109052051"))
 TIMEZONE = 'Africa/Lagos'
 SENT_FILE = "sent_messages.json"
 
