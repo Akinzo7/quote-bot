@@ -2,7 +2,9 @@ name: Send Daily Quote
 
 on:
   schedule:
-  - cron: '35 10 * * *'  # 10:35 AM UTC TODAY
+<<<<<<< HEAD
+      - cron: '50 10 * * *'
+>>>>>>> d2243b8 (Test schedule for 10:50 UTC)
   workflow_dispatch:
 
 jobs:
