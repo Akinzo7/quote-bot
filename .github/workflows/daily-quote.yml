@@ -3,12 +3,14 @@ name: Send Daily Quote
 on:
   schedule:
 <<<<<<< HEAD
-      - cron: '50 10 * * *'
+      - cron: '5 10 * * *'  # 10:05 AM UTC = 11:05 AM Nigeria
 >>>>>>> d2243b8 (Test schedule for 10:50 UTC)
   workflow_dispatch:
 
 jobs:
-  send-quote:
+  send-quote:git add .github/workflows/daily-quote.yml
+git commit -m "Test schedule for 10:05 UTC"
+git push origin main
     runs-on: ubuntu-latest
     
     steps:
