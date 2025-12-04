@@ -2,7 +2,7 @@ name: Send Daily Quote
 
 on:
   schedule:
-    - cron: '5 10 * * *'  # 10:05 AM UTC = 11:05 AM Nigeria
+    - cron: '9 10 * * *'  # 10:09 AM UTC = 11:09 AM Nigeria
   workflow_dispatch:
 
 jobs:
